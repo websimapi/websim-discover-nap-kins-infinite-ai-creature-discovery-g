@@ -304,10 +304,21 @@
             animation: pulse 2s infinite;
         }
         
+        .clickable-area.discovered {
+            border-color: rgba(102, 126, 234, 0.8);
+            background: rgba(102, 126, 234, 0.2);
+            animation: none;
+        }
+        
         .clickable-area:hover {
             border-color: rgba(255, 215, 0, 1);
             background: rgba(255, 215, 0, 0.2);
             transform: translate(-50%, -50%) scale(1.2);
+        }
+        
+        .clickable-area.discovered:hover {
+            border-color: rgba(102, 126, 234, 1);
+            background: rgba(102, 126, 234, 0.3);
         }
         
         @keyframes pulse {
@@ -366,6 +377,8 @@
             const [clickableAreas, setClickableAreas] = useState([]);
             const [sparkles, setSparkles] = useState([]);
             const [hoveredArea, setHoveredArea] = useState(null);
+            const [discoveredAreas, setDiscoveredAreas] = useState(new Set());
+            const [areaDiscoveries, setAreaDiscoveries] = useState(new Map());
             const worldImageRef = useRef(null);
 
             // Subscribe to napkin discoveries
@@ -397,6 +410,10 @@
             useEffect(() => {
                 if (currentWorld && currentWorld.clickableAreas) {
                     setClickableAreas(currentWorld.clickableAreas);
+                    
+                    // Reset discovered areas when world changes
+                    setDiscoveredAreas(new Set());
+                    setAreaDiscoveries(new Map());
                     
                     // Check if we have valid clickable areas
                     if (currentWorld.clickableAreas.length === 0) {
@@ -468,7 +485,8 @@
                                 role: "system",
                                 content: `Analyze this fantasy landscape image and identify 6-10 distinct objects or creatures that are clearly visible and would be interesting to click on. 
                                 Look for: trees, rocks, flowers, animals, buildings, magical elements, water features, etc.
-                                For each object, provide precise coordinates as percentages (0-100) where the object is located.
+                                For each object, provide precise coordinates as percentages (0-100) where the object is located in the image.
+                                The coordinates should be for the center of the object.
                                 Respond with JSON only, no other text.
                                 Schema: {
                                     "areas": [
@@ -485,7 +503,7 @@
                             {
                                 role: "user",
                                 content: [
-                                    { type: "text", text: "Find clickable objects in this image that are clearly visible:" },
+                                    { type: "text", text: "Find clickable objects in this image. Give coordinates as percentages (0-100) for where each object is located:" },
                                     { type: "image_url", image_url: { url: imageUrl } }
                                 ]
                             }
@@ -498,8 +516,8 @@
                     
                     // Validate areas have required properties
                     const validAreas = areas.filter(area => 
-                        area.x >= 0 && area.x <= 100 && 
-                        area.y >= 0 && area.y <= 100 && 
+                        area.x >= 5 && area.x <= 95 && 
+                        area.y >= 5 && area.y <= 95 && 
                         area.objectType && area.description
                     );
 
@@ -528,8 +546,8 @@
                 for (let i = 0; i < 8; i++) {
                     const objectType = objectTypes[i % objectTypes.length];
                     areas.push({
-                        x: Math.random() * 70 + 15, // 15-85% range
-                        y: Math.random() * 70 + 15, // 15-85% range
+                        x: Math.random() * 80 + 10, // 10-90% range
+                        y: Math.random() * 80 + 10, // 10-90% range
                         objectType: objectType,
                         description: `A ${objectType} that might hide magical creatures`,
                         creatureType: `${objectType} dweller`
@@ -573,6 +591,23 @@
 
             async function handleAreaClick(area, event) {
                 event.stopPropagation();
+                const areaKey = `${area.x}-${area.y}`;
+                
+                // Check if area is already discovered
+                if (discoveredAreas.has(areaKey)) {
+                    const existingDiscovery = areaDiscoveries.get(areaKey);
+                    if (existingDiscovery) {
+                        // Show existing discovery
+                        setDiscovery({
+                            ...existingDiscovery,
+                            x: event.clientX,
+                            y: event.clientY
+                        });
+                        setTimeout(() => setDiscovery(null), 3000);
+                    }
+                    return;
+                }
+                
                 await discoverNapkin(area, event.clientX, event.clientY);
             }
 
@@ -584,6 +619,11 @@
 
             async function discoverNapkin(area, clickX, clickY) {
                 try {
+                    const areaKey = `${area.x}-${area.y}`;
+                    
+                    // Mark area as discovered immediately
+                    setDiscoveredAreas(prev => new Set([...prev, areaKey]));
+                    
                     // Show discovery effect
                     const effectId = Date.now();
                     setDiscoveryEffects(prev => [...prev, {
@@ -630,8 +670,12 @@
                         imageUrl: napkinImage.url,
                         objectType: area.objectType,
                         discoveryLocation: area.description,
-                        discoveredAt: new Date().toISOString()
+                        discoveredAt: new Date().toISOString(),
+                        areaKey: areaKey
                     });
+
+                    // Store the discovery for this area
+                    setAreaDiscoveries(prev => new Map([...prev, [areaKey, napkin]]));
 
                     // Show discovery popup
                     setDiscovery({
@@ -644,6 +688,13 @@
 
                 } catch (error) {
                     console.error('Failed to discover Nap-Kin:', error);
+                    // Remove from discovered areas if there was an error
+                    const areaKey = `${area.x}-${area.y}`;
+                    setDiscoveredAreas(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(areaKey);
+                        return newSet;
+                    });
                 }
             }
 
@@ -698,20 +749,25 @@
                                     />
                                     
                                     {/* Clickable Areas */}
-                                    {clickableAreas.map((area, index) => (
-                                        <div
-                                            key={index}
-                                            className="clickable-area"
-                                            style={{
-                                                left: `${area.x}%`,
-                                                top: `${area.y}%`
-                                            }}
-                                            onClick={(e) => handleAreaClick(area, e)}
-                                            onMouseEnter={(e) => handleAreaHover(area, e)}
-                                            onMouseLeave={handleAreaLeave}
-                                            title={area.description}
-                                        />
-                                    ))}
+                                    {clickableAreas.map((area, index) => {
+                                        const areaKey = `${area.x}-${area.y}`;
+                                        const isDiscovered = discoveredAreas.has(areaKey);
+                                        
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`clickable-area ${isDiscovered ? 'discovered' : ''}`}
+                                                style={{
+                                                    left: `${area.x}%`,
+                                                    top: `${area.y}%`
+                                                }}
+                                                onClick={(e) => handleAreaClick(area, e)}
+                                                onMouseEnter={(e) => !isDiscovered && handleAreaHover(area, e)}
+                                                onMouseLeave={handleAreaLeave}
+                                                title={isDiscovered ? `Already discovered: ${areaDiscoveries.get(areaKey)?.name || 'Unknown'}` : area.description}
+                                            />
+                                        );
+                                    })}
                                 </>
                             )}
                             
