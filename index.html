@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discover Nap-Kins - Infinite AI Creature Discovery Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .stat-item {
+            color: white;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-number {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        .world-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .world-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: crosshair;
+            transition: transform 0.3s ease;
+        }
+
+        .world-image:hover {
+            transform: scale(1.02);
+        }
+
+        .discovery-popup {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            max-width: 400px;
+            text-align: center;
+            animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 0;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .discovered-napkin {
+            width: 200px;
+            height: 200px;
+            border-radius: 15px;
+            margin: 0 auto 1rem;
+            object-fit: cover;
+            border: 3px solid #667eea;
+        }
+
+        .napkin-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .napkin-description {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .discoverer {
+            font-size: 0.8rem;
+            color: #888;
+            font-style: italic;
+        }
+
+        .gallery-sidebar {
+            width: 350px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+
+        .gallery-title {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .napkin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 1rem;
+        }
+
+        .napkin-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 0.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .napkin-card:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .napkin-thumb {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            margin: 0 auto 0.5rem;
+            display: block;
+        }
+
+        .napkin-card-name {
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.2rem;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .world-controls {
+            position: absolute;
+            bottom: 2rem;
+            left: 2rem;
+            display: flex;
+            gap: 1rem;
+            z-index: 100;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .online-users {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            object-fit: cover;
+        }
+
+        .discovery-effect {
+            position: absolute;
+            pointer-events: none;
+            font-size: 2rem;
+            color: #FFD700;
+            font-weight: bold;
+            animation: discoveryPop 2s ease-out forwards;
+        }
+
+        @keyframes discoveryPop {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1) translateY(-50px);
+                opacity: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .gallery-sidebar {
+                width: 100%;
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                z-index: 2000;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+            }
+
+            .gallery-sidebar.open {
+                transform: translateX(0);
+            }
+
+            .header {
+                padding: 1rem;
+            }
+
+            .stats {
+                gap: 1rem;
+            }
+
+            .world-controls {
+                bottom: 1rem;
+                left: 1rem;
+                right: 1rem;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // Initialize WebsimSocket
+        const room = new WebsimSocket();
+
+        function App() {
+            const [currentWorld, setCurrentWorld] = useState(null);
+            const [napkins, setNapkins] = useState([]);
+            const [discovery, setDiscovery] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [onlineUsers, setOnlineUsers] = useState({});
+            const [currentUser, setCurrentUser] = useState(null);
+            const [galleryOpen, setGalleryOpen] = useState(false);
+            const [discoveryEffects, setDiscoveryEffects] = useState([]);
+            const worldImageRef = useRef(null);
+
+            // Subscribe to napkin discoveries
+            const discoveredNapkins = React.useSyncExternalStore(
+                room.collection('napkin').subscribe,
+                room.collection('napkin').getList
+            );
+
+            // Subscribe to world data
+            const worldData = React.useSyncExternalStore(
+                room.collection('world').subscribe,
+                room.collection('world').getList
+            );
+
+            useEffect(() => {
+                initializeApp();
+            }, []);
+
+            useEffect(() => {
+                setNapkins(discoveredNapkins.reverse());
+            }, [discoveredNapkins]);
+
+            useEffect(() => {
+                if (worldData.length > 0) {
+                    setCurrentWorld(worldData[0]);
+                }
+            }, [worldData]);
+
+            async function initializeApp() {
+                try {
+                    await room.initialize();
+                    
+                    // Get current user
+                    const user = await window.websim.getCurrentUser();
+                    setCurrentUser(user);
+
+                    // Initialize world if none exists
+                    const existingWorlds = room.collection('world').getList();
+                    if (existingWorlds.length === 0) {
+                        await generateNewWorld();
+                    }
+
+                    setLoading(false);
+                } catch (error) {
+                    console.error('Failed to initialize app:', error);
+                    setLoading(false);
+                }
+            }
+
+            async function generateNewWorld() {
+                setLoading(true);
+                try {
+                    const worldPrompts = [
+                        "A magical forest clearing with glowing mushrooms and crystal streams",
+                        "An underwater coral reef city with bioluminescent plants",
+                        "A floating sky island with waterfalls and rainbow bridges",
+                        "A mystical mountain valley with ancient ruins and glowing crystals",
+                        "A dreamy candy landscape with cotton candy clouds and chocolate rivers",
+                        "A space station greenhouse with alien plants and zero gravity gardens",
+                        "A steampunk clockwork city with gears and mechanical gardens",
+                        "A prehistoric jungle with massive flowers and ancient trees"
+                    ];
+
+                    const randomPrompt = worldPrompts[Math.floor(Math.random() * worldPrompts.length)];
+                    
+                    const worldImage = await websim.imageGen({
+                        prompt: `${randomPrompt}, vibrant colors, detailed, fantasy art style, wide landscape view`,
+                        aspect_ratio: "16:9"
+                    });
+
+                    await room.collection('world').create({
+                        imageUrl: worldImage.url,
+                        prompt: randomPrompt,
+                        clickableAreas: await generateClickableAreas(worldImage.url)
+                    });
+
+                } catch (error) {
+                    console.error('Failed to generate world:', error);
+                }
+                setLoading(false);
+            }
+
+            async function generateClickableAreas(imageUrl) {
+                try {
+                    const completion = await websim.chat.completions.create({
+                        messages: [
+                            {
+                                role: "system",
+                                content: `Analyze this fantasy landscape image and identify 8-12 interesting areas where magical creatures might be hiding. 
+                                For each area, provide coordinates as percentages (0-100) and describe what type of creature might be found there.
+                                Respond with JSON only, no other text.
+                                Schema: {
+                                    "areas": [
+                                        {
+                                            "x": number,
+                                            "y": number,
+                                            "description": string,
+                                            "creatureType": string
+                                        }
+                                    ]
+                                }`
+                            },
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: "Find clickable areas in this image:" },
+                                    { type: "image_url", image_url: { url: imageUrl } }
+                                ]
+                            }
+                        ],
+                        json: true
+                    });
+
+                    return JSON.parse(completion.content).areas;
+                } catch (error) {
+                    console.error('Failed to generate clickable areas:', error);
+                    return [];
+                }
+            }
+
+            async function handleWorldClick(event) {
+                if (!currentWorld || !currentWorld.clickableAreas) return;
+
+                const rect = worldImageRef.current.getBoundingClientRect();
+                const x = ((event.clientX - rect.left) / rect.width) * 100;
+                const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+                // Find nearby clickable area
+                const nearbyArea = currentWorld.clickableAreas.find(area => {
+                    const distance = Math.sqrt(
+                        Math.pow(x - area.x, 2) + Math.pow(y - area.y, 2)
+                    );
+                    return distance < 10; // 10% tolerance
+                });
+
+                if (nearbyArea) {
+                    await discoverNapkin(nearbyArea, event.clientX, event.clientY);
+                }
+            }
+
+            async function discoverNapkin(area, clickX, clickY) {
+                try {
+                    // Show discovery effect
+                    const effectId = Date.now();
+                    setDiscoveryEffects(prev => [...prev, {
+                        id: effectId,
+                        x: clickX,
+                        y: clickY,
+                        text: "✨ Discovered!"
+                    }]);
+
+                    setTimeout(() => {
+                        setDiscoveryEffects(prev => prev.filter(e => e.id !== effectId));
+                    }, 2000);
+
+                    // Generate unique Nap-Kin
+                    const napkinImage = await websim.imageGen({
+                        prompt: `A cute, magical creature called a Nap-Kin, ${area.creatureType} type, adorable, cartoonish, friendly eyes, soft fur or skin, magical aura, pastel colors, kawaii style`,
+                        aspect_ratio: "1:1"
+                    });
+
+                    // Generate name and description
+                    const napkinDetails = await websim.chat.completions.create({
+                        messages: [
+                            {
+                                role: "system",
+                                content: `Create a unique name and description for this Nap-Kin creature. 
+                                Names should be cute and whimsical (like "Sleepy Wink" or "Cozy Puff").
+                                Descriptions should be short and endearing.
+                                Respond with JSON only: {"name": string, "description": string}`
+                            },
+                            {
+                                role: "user",
+                                content: `This Nap-Kin was found in: ${area.description}. It's a ${area.creatureType} type creature.`
+                            }
+                        ],
+                        json: true
+                    });
+
+                    const details = JSON.parse(napkinDetails.content);
+
+                    // Save to database
+                    const napkin = await room.collection('napkin').create({
+                        name: details.name,
+                        description: details.description,
+                        imageUrl: napkinImage.url,
+                        creatureType: area.creatureType,
+                        discoveryLocation: area.description,
+                        discoveredAt: new Date().toISOString()
+                    });
+
+                    // Show discovery popup
+                    setDiscovery({
+                        ...napkin,
+                        x: clickX,
+                        y: clickY
+                    });
+
+                    setTimeout(() => setDiscovery(null), 4000);
+
+                } catch (error) {
+                    console.error('Failed to discover Nap-Kin:', error);
+                }
+            }
+
+            const totalDiscoveries = napkins.length;
+            const myDiscoveries = napkins.filter(n => n.username === currentUser?.username).length;
+
+            if (loading) {
+                return (
+                    <div className="loading">
+                        <div className="loading-spinner"></div>
+                        <div>Generating magical world...</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="app">
+                    <header className="header">
+                        <div className="logo">🌟 Nap-Kins</div>
+                        <div className="stats">
+                            <div className="stat-item">
+                                <span>Total Discovered:</span>
+                                <span className="stat-number">{totalDiscoveries}</span>
+                            </div>
+                            <div className="stat-item">
+                                <span>My Discoveries:</span>
+                                <span className="stat-number">{myDiscoveries}</span>
+                            </div>
+                            {currentUser && (
+                                <div className="online-users">
+                                    <img 
+                                        src={currentUser.avatarUrl} 
+                                        alt={currentUser.username}
+                                        className="user-avatar"
+                                    />
+                                    <span style={{color: 'white', fontSize: '0.9rem'}}>{currentUser.username}</span>
+                                </div>
+                            )}
+                        </div>
+                    </header>
+
+                    <div className="main-content">
+                        <div className="world-container">
+                            {currentWorld && (
+                                <img
+                                    ref={worldImageRef}
+                                    src={currentWorld.imageUrl}
+                                    alt="Magical World"
+                                    className="world-image"
+                                    onClick={handleWorldClick}
+                                />
+                            )}
+                            
+                            <div className="world-controls">
+                                <button 
+                                    className="control-btn"
+                                    onClick={generateNewWorld}
+                                >
+                                    🌍 New World
+                                </button>
+                                <button 
+                                    className="control-btn"
+                                    onClick={() => setGalleryOpen(!galleryOpen)}
+                                >
+                                    📖 Gallery
+                                </button>
+                            </div>
+
+                            {/* Discovery Effects */}
+                            {discoveryEffects.map(effect => (
+                                <div
+                                    key={effect.id}
+                                    className="discovery-effect"
+                                    style={{
+                                        left: effect.x,
+                                        top: effect.y
+                                    }}
+                                >
+                                    {effect.text}
+                                </div>
+                            ))}
+
+                            {/* Discovery Popup */}
+                            {discovery && (
+                                <div
+                                    className="discovery-popup"
+                                    style={{
+                                        left: discovery.x,
+                                        top: discovery.y
+                                    }}
+                                >
+                                    <img
+                                        src={discovery.imageUrl}
+                                        alt={discovery.name}
+                                        className="discovered-napkin"
+                                    />
+                                    <div className="napkin-name">{discovery.name}</div>
+                                    <div className="napkin-description">{discovery.description}</div>
+                                    <div className="discoverer">Discovered by {discovery.username}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className={`gallery-sidebar ${galleryOpen ? 'open' : ''}`}>
+                            <div className="gallery-title">🎨 Discovered Nap-Kins</div>
+                            <div className="napkin-grid">
+                                {napkins.map(napkin => (
+                                    <div key={napkin.id} className="napkin-card">
+                                        <img
+                                            src={napkin.imageUrl}
+                                            alt={napkin.name}
+                                            className="napkin-thumb"
+                                        />
+                                        <div className="napkin-card-name">{napkin.name}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
