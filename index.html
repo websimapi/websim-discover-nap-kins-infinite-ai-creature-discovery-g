@@ -85,7 +85,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            cursor: crosshair;
+            cursor: default;
             transition: transform 0.3s ease;
         }
 
@@ -291,35 +291,56 @@
             }
         }
 
-        @media (max-width: 768px) {
-            .gallery-sidebar {
-                width: 100%;
-                position: fixed;
-                top: 0;
-                left: 0;
-                height: 100vh;
-                z-index: 2000;
-                transform: translateX(100%);
-                transition: transform 0.3s ease;
+        .clickable-area {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 215, 0, 0.6);
+            background: rgba(255, 215, 0, 0.1);
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            animation: pulse 2s infinite;
+        }
+        
+        .clickable-area:hover {
+            border-color: rgba(255, 215, 0, 1);
+            background: rgba(255, 215, 0, 0.2);
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.6;
+                transform: translate(-50%, -50%) scale(1);
             }
-
-            .gallery-sidebar.open {
-                transform: translateX(0);
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.1);
             }
-
-            .header {
-                padding: 1rem;
+        }
+        
+        .sparkle {
+            position: absolute;
+            pointer-events: none;
+            font-size: 1.5rem;
+            color: #FFD700;
+            animation: sparkle 1s ease-out forwards;
+        }
+        
+        @keyframes sparkle {
+            0% {
+                opacity: 0;
+                transform: scale(0.5) rotate(0deg);
             }
-
-            .stats {
-                gap: 1rem;
+            50% {
+                opacity: 1;
+                transform: scale(1) rotate(180deg);
             }
-
-            .world-controls {
-                bottom: 1rem;
-                left: 1rem;
-                right: 1rem;
-                justify-content: center;
+            100% {
+                opacity: 0;
+                transform: scale(0.5) rotate(360deg);
             }
         }
     </style>
@@ -342,6 +363,9 @@
             const [currentUser, setCurrentUser] = useState(null);
             const [galleryOpen, setGalleryOpen] = useState(false);
             const [discoveryEffects, setDiscoveryEffects] = useState([]);
+            const [clickableAreas, setClickableAreas] = useState([]);
+            const [sparkles, setSparkles] = useState([]);
+            const [hoveredArea, setHoveredArea] = useState(null);
             const worldImageRef = useRef(null);
 
             // Subscribe to napkin discoveries
@@ -369,6 +393,18 @@
                     setCurrentWorld(worldData[0]);
                 }
             }, [worldData]);
+
+            useEffect(() => {
+                if (currentWorld && currentWorld.clickableAreas) {
+                    setClickableAreas(currentWorld.clickableAreas);
+                    
+                    // Check if we have valid clickable areas
+                    if (currentWorld.clickableAreas.length === 0) {
+                        console.log('No clickable areas found, generating new world');
+                        generateNewWorld();
+                    }
+                }
+            }, [currentWorld]);
 
             async function initializeApp() {
                 try {
@@ -430,14 +466,16 @@
                         messages: [
                             {
                                 role: "system",
-                                content: `Analyze this fantasy landscape image and identify 8-12 interesting areas where magical creatures might be hiding. 
-                                For each area, provide coordinates as percentages (0-100) and describe what type of creature might be found there.
+                                content: `Analyze this fantasy landscape image and identify 6-10 distinct objects or creatures that are clearly visible and would be interesting to click on. 
+                                Look for: trees, rocks, flowers, animals, buildings, magical elements, water features, etc.
+                                For each object, provide precise coordinates as percentages (0-100) where the object is located.
                                 Respond with JSON only, no other text.
                                 Schema: {
                                     "areas": [
                                         {
                                             "x": number,
                                             "y": number,
+                                            "objectType": string,
                                             "description": string,
                                             "creatureType": string
                                         }
@@ -447,7 +485,7 @@
                             {
                                 role: "user",
                                 content: [
-                                    { type: "text", text: "Find clickable areas in this image:" },
+                                    { type: "text", text: "Find clickable objects in this image that are clearly visible:" },
                                     { type: "image_url", image_url: { url: imageUrl } }
                                 ]
                             }
@@ -455,8 +493,24 @@
                         json: true
                     });
 
-                    const areas = JSON.parse(completion.content).areas;
-                    return areas && areas.length > 0 ? areas : generateFallbackAreas();
+                    const result = JSON.parse(completion.content);
+                    const areas = result.areas || [];
+                    
+                    // Validate areas have required properties
+                    const validAreas = areas.filter(area => 
+                        area.x >= 0 && area.x <= 100 && 
+                        area.y >= 0 && area.y <= 100 && 
+                        area.objectType && area.description
+                    );
+
+                    console.log('Generated areas:', validAreas);
+
+                    if (validAreas.length === 0) {
+                        console.log('No valid areas generated, creating fallback');
+                        return generateFallbackAreas();
+                    }
+
+                    return validAreas;
                 } catch (error) {
                     console.error('Failed to generate clickable areas:', error);
                     return generateFallbackAreas();
@@ -465,66 +519,67 @@
 
             function generateFallbackAreas() {
                 // Generate default clickable areas if AI fails
-                const creatureTypes = [
-                    "forest sprite", "water fairy", "mountain dweller", "sky dancer",
-                    "crystal guardian", "flower pixie", "shadow whisper", "light butterfly"
+                const objectTypes = [
+                    "ancient tree", "mystical rock", "glowing flower", "crystal formation",
+                    "magical fountain", "enchanted bush", "floating stone", "mysterious cave"
                 ];
                 
                 const areas = [];
-                for (let i = 0; i < 10; i++) {
+                for (let i = 0; i < 8; i++) {
+                    const objectType = objectTypes[i % objectTypes.length];
                     areas.push({
-                        x: Math.random() * 80 + 10, // 10-90% range
-                        y: Math.random() * 80 + 10, // 10-90% range
-                        description: `A mysterious ${creatureTypes[i % creatureTypes.length]} hiding spot`,
-                        creatureType: creatureTypes[i % creatureTypes.length]
+                        x: Math.random() * 70 + 15, // 15-85% range
+                        y: Math.random() * 70 + 15, // 15-85% range
+                        objectType: objectType,
+                        description: `A ${objectType} that might hide magical creatures`,
+                        creatureType: `${objectType} dweller`
                     });
                 }
+                console.log('Generated fallback areas:', areas);
                 return areas;
             }
 
-            async function handleWorldClick(event) {
-                if (!currentWorld) return;
-
-                const rect = worldImageRef.current.getBoundingClientRect();
-                const x = ((event.clientX - rect.left) / rect.width) * 100;
-                const y = ((event.clientY - rect.top) / rect.height) * 100;
-
-                console.log('Click position:', { x, y });
-                console.log('Available areas:', currentWorld.clickableAreas);
-
-                // Ensure we have clickable areas
-                if (!currentWorld.clickableAreas || currentWorld.clickableAreas.length === 0) {
-                    console.log('No clickable areas, generating fallback');
-                    const fallbackAreas = generateFallbackAreas();
-                    // Update the world with fallback areas
-                    await room.collection('world').update(currentWorld.id, {
-                        clickableAreas: fallbackAreas
+            function handleAreaHover(area, event) {
+                setHoveredArea(area);
+                
+                // Generate sparkles around the hovered area
+                const sparkleCount = 3;
+                const newSparkles = [];
+                
+                for (let i = 0; i < sparkleCount; i++) {
+                    const sparkleId = Date.now() + i;
+                    const offsetX = (Math.random() - 0.5) * 60;
+                    const offsetY = (Math.random() - 0.5) * 60;
+                    
+                    newSparkles.push({
+                        id: sparkleId,
+                        x: event.clientX + offsetX,
+                        y: event.clientY + offsetY,
+                        symbol: ['✨', '⭐', '💫'][Math.floor(Math.random() * 3)]
                     });
-                    return;
                 }
+                
+                setSparkles(prev => [...prev, ...newSparkles]);
+                
+                // Remove sparkles after animation
+                setTimeout(() => {
+                    setSparkles(prev => prev.filter(s => !newSparkles.some(ns => ns.id === s.id)));
+                }, 1000);
+            }
 
-                // Find nearby clickable area with more forgiving tolerance
-                const nearbyArea = currentWorld.clickableAreas.find(area => {
-                    const distance = Math.sqrt(
-                        Math.pow(x - area.x, 2) + Math.pow(y - area.y, 2)
-                    );
-                    return distance < 20; // Increased tolerance to 20%
-                });
+            function handleAreaLeave() {
+                setHoveredArea(null);
+            }
 
-                console.log('Nearby area found:', nearbyArea);
+            async function handleAreaClick(area, event) {
+                event.stopPropagation();
+                await discoverNapkin(area, event.clientX, event.clientY);
+            }
 
-                if (nearbyArea) {
-                    await discoverNapkin(nearbyArea, event.clientX, event.clientY);
-                } else {
-                    // If no area found, create a discovery at the clicked location
-                    const impromptuArea = {
-                        x: x,
-                        y: y,
-                        description: "A hidden spot revealed by your keen observation",
-                        creatureType: "mysterious wanderer"
-                    };
-                    await discoverNapkin(impromptuArea, event.clientX, event.clientY);
-                }
+            async function handleWorldClick(event) {
+                // Only allow clicks on designated areas now
+                // This function will only be called if no area was clicked
+                console.log('Clicked on non-interactive area');
             }
 
             async function discoverNapkin(area, clickX, clickY) {
@@ -542,9 +597,9 @@
                         setDiscoveryEffects(prev => prev.filter(e => e.id !== effectId));
                     }, 2000);
 
-                    // Generate unique Nap-Kin
+                    // Generate unique Nap-Kin based on the object type
                     const napkinImage = await websim.imageGen({
-                        prompt: `A cute, magical creature called a Nap-Kin, ${area.creatureType} type, adorable, cartoonish, friendly eyes, soft fur or skin, magical aura, pastel colors, kawaii style`,
+                        prompt: `A cute, magical creature called a Nap-Kin that lives in/on a ${area.objectType}, adorable, cartoonish, friendly eyes, soft fur or scales, magical aura, pastel colors, kawaii style, fantasy creature`,
                         aspect_ratio: "1:1"
                     });
 
@@ -555,12 +610,12 @@
                                 role: "system",
                                 content: `Create a unique name and description for this Nap-Kin creature. 
                                 Names should be cute and whimsical (like "Sleepy Wink" or "Cozy Puff").
-                                Descriptions should be short and endearing.
+                                Descriptions should be short and endearing, mentioning their habitat.
                                 Respond with JSON only: {"name": string, "description": string}`
                             },
                             {
                                 role: "user",
-                                content: `This Nap-Kin was found in: ${area.description}. It's a ${area.creatureType} type creature.`
+                                content: `This Nap-Kin was found living in/on a ${area.objectType}. ${area.description}`
                             }
                         ],
                         json: true
@@ -573,7 +628,7 @@
                         name: details.name,
                         description: details.description,
                         imageUrl: napkinImage.url,
-                        creatureType: area.creatureType,
+                        objectType: area.objectType,
                         discoveryLocation: area.description,
                         discoveredAt: new Date().toISOString()
                     });
@@ -633,13 +688,31 @@
                     <div className="main-content">
                         <div className="world-container">
                             {currentWorld && (
-                                <img
-                                    ref={worldImageRef}
-                                    src={currentWorld.imageUrl}
-                                    alt="Magical World"
-                                    className="world-image"
-                                    onClick={handleWorldClick}
-                                />
+                                <>
+                                    <img
+                                        ref={worldImageRef}
+                                        src={currentWorld.imageUrl}
+                                        alt="Magical World"
+                                        className="world-image"
+                                        onClick={handleWorldClick}
+                                    />
+                                    
+                                    {/* Clickable Areas */}
+                                    {clickableAreas.map((area, index) => (
+                                        <div
+                                            key={index}
+                                            className="clickable-area"
+                                            style={{
+                                                left: `${area.x}%`,
+                                                top: `${area.y}%`
+                                            }}
+                                            onClick={(e) => handleAreaClick(area, e)}
+                                            onMouseEnter={(e) => handleAreaHover(area, e)}
+                                            onMouseLeave={handleAreaLeave}
+                                            title={area.description}
+                                        />
+                                    ))}
+                                </>
                             )}
                             
                             <div className="world-controls">
@@ -656,6 +729,20 @@
                                     📖 Gallery
                                 </button>
                             </div>
+
+                            {/* Sparkles */}
+                            {sparkles.map(sparkle => (
+                                <div
+                                    key={sparkle.id}
+                                    className="sparkle"
+                                    style={{
+                                        left: sparkle.x,
+                                        top: sparkle.y
+                                    }}
+                                >
+                                    {sparkle.symbol}
+                                </div>
+                            ))}
 
                             {/* Discovery Effects */}
                             {discoveryEffects.map(effect => (
