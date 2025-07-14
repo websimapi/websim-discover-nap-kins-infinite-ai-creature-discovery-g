@@ -455,30 +455,75 @@
                         json: true
                     });
 
-                    return JSON.parse(completion.content).areas;
+                    const areas = JSON.parse(completion.content).areas;
+                    return areas && areas.length > 0 ? areas : generateFallbackAreas();
                 } catch (error) {
                     console.error('Failed to generate clickable areas:', error);
-                    return [];
+                    return generateFallbackAreas();
                 }
             }
 
+            function generateFallbackAreas() {
+                // Generate default clickable areas if AI fails
+                const creatureTypes = [
+                    "forest sprite", "water fairy", "mountain dweller", "sky dancer",
+                    "crystal guardian", "flower pixie", "shadow whisper", "light butterfly"
+                ];
+                
+                const areas = [];
+                for (let i = 0; i < 10; i++) {
+                    areas.push({
+                        x: Math.random() * 80 + 10, // 10-90% range
+                        y: Math.random() * 80 + 10, // 10-90% range
+                        description: `A mysterious ${creatureTypes[i % creatureTypes.length]} hiding spot`,
+                        creatureType: creatureTypes[i % creatureTypes.length]
+                    });
+                }
+                return areas;
+            }
+
             async function handleWorldClick(event) {
-                if (!currentWorld || !currentWorld.clickableAreas) return;
+                if (!currentWorld) return;
 
                 const rect = worldImageRef.current.getBoundingClientRect();
                 const x = ((event.clientX - rect.left) / rect.width) * 100;
                 const y = ((event.clientY - rect.top) / rect.height) * 100;
 
-                // Find nearby clickable area
+                console.log('Click position:', { x, y });
+                console.log('Available areas:', currentWorld.clickableAreas);
+
+                // Ensure we have clickable areas
+                if (!currentWorld.clickableAreas || currentWorld.clickableAreas.length === 0) {
+                    console.log('No clickable areas, generating fallback');
+                    const fallbackAreas = generateFallbackAreas();
+                    // Update the world with fallback areas
+                    await room.collection('world').update(currentWorld.id, {
+                        clickableAreas: fallbackAreas
+                    });
+                    return;
+                }
+
+                // Find nearby clickable area with more forgiving tolerance
                 const nearbyArea = currentWorld.clickableAreas.find(area => {
                     const distance = Math.sqrt(
                         Math.pow(x - area.x, 2) + Math.pow(y - area.y, 2)
                     );
-                    return distance < 10; // 10% tolerance
+                    return distance < 20; // Increased tolerance to 20%
                 });
+
+                console.log('Nearby area found:', nearbyArea);
 
                 if (nearbyArea) {
                     await discoverNapkin(nearbyArea, event.clientX, event.clientY);
+                } else {
+                    // If no area found, create a discovery at the clicked location
+                    const impromptuArea = {
+                        x: x,
+                        y: y,
+                        description: "A hidden spot revealed by your keen observation",
+                        creatureType: "mysterious wanderer"
+                    };
+                    await discoverNapkin(impromptuArea, event.clientX, event.clientY);
                 }
             }
 
@@ -672,4 +717,3 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
